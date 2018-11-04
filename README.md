@@ -1,6 +1,6 @@
 # Burgwatching
 
-This is an admittedly silly demonstration of what I've learned so far in SI 364. One of my roomates is a total ghost, known him for 4 years and rarely see him, so I decided to make a simple page for my buddies and I to track our friend. 
+This is an admittedly silly demonstration of what I've learned so far in SI 364. One of my roomates, Burgeson, is a total ghost, known him for 4 years and rarely see him, so I decided to make a simple page for my buddies and I to track our friend. 
 
 #### Code Requirements
 
