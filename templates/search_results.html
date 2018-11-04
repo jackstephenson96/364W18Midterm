@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<b>Sightings for user: {{username}}</b>
+<br>
+<br>
+{% for nm in sightings | reverse %}
+  <li>seen {{nm[0]}} @ {{nm[1]}} (lat:{{nm[2]}}, lng:{{nm[3]}}) <br> at {{nm[4]}} <i> by {{ nm[5] }}</i></li><br>
+{% endfor %}
+</ul>
+
+{% if not sightings %}
+    There are no sightings to show.
+{% endif %}
+
+{% endblock %}

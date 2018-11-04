@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<b>Search sightings by username</b>
+<br>
+<br>
+<form action="" method="POST">
+	{{ form.hidden_tag() }}
+	{{ form.search.label }} {{ form.search() }}
+<br>
+    {{ form.submit() }}
+</form>
+</div>
+{% if sightings %}
+{% for nm in sightings | reverse %}
+  <li>seen {{nm[0]}} @ {{nm[1]}} (lat:{{nm[2]}}, lng:{{nm[3]}}) <br> at {{nm[4]}} <i> by {{ nm[5] }}</i></li><br>
+{% endfor %}
+</ul>
+
+{% endif %}
+
+<div>
+{% for message in get_flashed_messages() %}
+    <strong>{{ message }}</strong>
+{% endfor %}
+</div>
+{% endblock %}
