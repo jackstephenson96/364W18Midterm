@@ -47,31 +47,24 @@ db = SQLAlchemy(app) # For database use
 ######## HELPER FXNS (If any) ########
 ######################################
 
-'''
-	text = db.Column(db.String(280))
-	lat = db.Column(db.Numeric)
-	lng = db.Column(db.Numeric)
-	name = db.Column(db.String(280))
-	formatted_address = db.Column(db.String(280))
-	'''
-
 def get_coords(locationstring):
 	#Google API to get latitude and longitude from an address
 	params = {}
 	params['key'] = apikey
 	params['input'] = locationstring
 	params['inputtype'] = 'textquery'
-	params['fields'] = "name,id,formatted_address,geometry"
+	params['fields'] = "name,id,formatted_address"
 	url = 'https://maps.googleapis.com/maps/api/place/findplacefromtext/json?parameters'
 	r = requests.get(url, params)
 	response = r.json()
-
 	location = response['candidates'][0]
-	r_dict = {'text':locationstring, 'lat':location['geometry']['location']['lat'], 
-	'lng':location['geometry']['location']['lng'], 'name':location['name'], 'formatted_address':
-	location['formatted_address']}
-	return r_dict
+	
 
+	# rdict = {'lat':response['results'][0]['locations'][0]['latLng']['lat'], 
+	# 		 'lng':response['results'][0]['locations'][0]['latLng']['lng']}
+	return location
+
+print(get_coords("Buffalo Wild Wings, Ann Arbor"))
 
 def validate_username(form, field):
 	if len(str(field.data).split(" ")) > 1:
@@ -96,14 +89,15 @@ def validate_username(form, field):
 class Sighting(db.Model):
 	__tablename__ = 'sighting'
 	id = db.Column(db.Integer, primary_key=True)
+	location = db.Column(db.String(280))
+	lat = db.Column(db.Numeric)
+	lng = db.Column(db.Numeric)
 	activity = db.Column(db.String(280))
-	location_text = db.Column(db.String(280))
 	time = db.Column(db.DateTime, nullable=False,
 		default=datetime.utcnow)
-	loc_id = db.Column(db.Integer, db.ForeignKey("location.id"))
 	user_id = db.Column(db.Integer, db.ForeignKey("user.id")) 
 	def __repr__(self):
-		return "{} @ {} (ID: {})".format(self.activity, self.location_text, self.id)
+		return "{} @ {} (ID: {})".format(self.activity, self.location, self.id)
 ##QUESTION## Should have a __repr__ method that returns strings of a format like:
 #### {Tweet text...} (ID: {tweet id})
 
@@ -117,17 +111,9 @@ class User(db.Model):
 		return "{}".format(self.username)
 
 class Location(db.Model):
-	__tablename__ = 'location'
+	__tablename__ = 'locations'
 	id = db.Column(db.Integer, primary_key=True)
-	text = db.Column(db.String(280))
-	lat = db.Column(db.Numeric)
-	lng = db.Column(db.Numeric)
-	name = db.Column(db.String(280), unique=True)
-	formatted_address = db.Column(db.String(280))
-	sightings = db.relationship('Sighting', backref='location')
-	def __repr__(self):
-		return "{} @ {} ({},{})".format(self.name, self.formatted_address, self.lat,self.lng)
-
+	sightings = db.relationship('Sighting', backref=location)
 
 ##Question## why is backref lowercase? What is this actually referencing?
 
@@ -179,40 +165,27 @@ def infoform():
 	form = InfoForm()
 	if form.validate_on_submit():
 		username = form.username.data
-		location_text = form.location.data
+		location = form.location.data
 		activity = form.activity.data
 
 		user = db.session.query(User).filter_by(username=username).first()
 		if not user:
 			user = User(username=username)
 			db.session.add(user)
+			db.session.commit()
 
-
-		location = Location.query.filter_by(text=location_text).first()
-		if not location:
-			l = get_coords(location_text)
-
-			text=l['text']
-			lat=l['lat'] 
-			lng=l['lng'] 
-			name=l['name']
-			formatted_address=l['formatted_address']
-			location = Location(text=text, lat=lat, lng=lng, name=name,
-				formatted_address=formatted_address)
-
-			db.session.add(location)
-
-
-		# print("TESTING")
-		# print(location)
-		if Sighting.query.filter_by(activity=activity, location_text=location_text).first():
+		if db.session.query(Sighting).filter_by(activity=activity, location=location).first():
 			flash("Someone has already saved this sighting!")
 			return redirect(url_for('infoform'))
 
+		lat = get_coords(location)['lat']
+		lng = get_coords(location)['lng']
 		sight = Sighting(
-						activity=activity,
-						location_text=location_text,  
-						loc_id=location.id,
+						location=location, 
+						lat=lat, 
+						lng=lng, 
+						activity=activity,  
+						time=datetime.now(),
 						user_id=user.id
 						)
 		db.session.add(sight)
@@ -230,10 +203,12 @@ def infoform():
 		flash("!!!! ERRORS IN FORM SUBMISSION - " + str(errors))
 	return render_template('info.html', form=form)
 
+
 @app.route('/feed', methods=['GET','POST'])
 def feed():
-	sightings = [(sighting.activity, str(sighting.time)[:19], sighting.location_text,
-	User.query.filter_by(id=sighting.user_id).first()) for sighting in Sighting.query.all()]
+	sightings = [(sighting.activity, sighting.location, sighting.lat, sighting.lng, 
+		str(sighting.time)[:19], str(User.query.filter_by(id=sighting.user_id).first())) 
+	for sighting in Sighting.query.all()]
 	return render_template('feed.html', sightings=sightings)
 
 # @app.route('/search', methods=['GET', 'POST'])
@@ -251,37 +226,32 @@ def search():
 
 				user = User.query.filter_by(username=username).first()
 				user_id = user.id
-				sightings = [(sighting.activity, sighting.location_text,
-				str(sighting.time)[:10], username) 
+				sightings = [(sighting.activity, sighting.location, sighting.lat, sighting.lng, 
+				str(sighting.time)[:19], username) 
 				for sighting in Sighting.query.filter_by(user_id=user_id).all()]
+				print("TESTING")
 				return render_template('search.html', form=searchform, sightings=sightings)
 
 			except:
 
 				flash("No sightings with that username")
+				print("ERROR")
 				return redirect(url_for("search"))
 	return render_template('search.html', form=searchform)
 
 @app.route("/map")
 def mapview():
 
-	sightings = []
-	for sighting in Sighting.query.all():
-		s = {}
-		loc = Location.query.filter_by(id=sighting.loc_id).first()
-		
-		s['icon'] = 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
-		s['lat'] = float(loc.lat)
-		s['lng'] = float(loc.lng)
-		s['infobox'] = "{} on {}".format(str(sighting.activity), str(sighting.time)[:10])
-		
-		sightings.append(s)
-
 	sightingmap = Map(
 		lat=42.271785,
 		lng=-83.736472,
 		identifier="view-side",
-	 	markers=sightings)
+	 	markers=[{'icon': 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png', 
+	 	'lat': float(sighting.lat), 
+	 	'lng': float(sighting.lng), 
+	 	'infobox': "{} on {}".format(str(sighting.activity), str(sighting.time)[:10])} 
+	 	for sighting in Sighting.query.all()],
+	)
 
 	return render_template('map.html', sightingmap=sightingmap)
 

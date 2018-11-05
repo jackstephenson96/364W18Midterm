@@ -13,7 +13,7 @@
 </div>
 {% if sightings %}
 {% for nm in sightings | reverse %}
-  <li>seen {{nm[0]}} @ {{nm[1]}} (lat:{{nm[2]}}, lng:{{nm[3]}}) <br> at {{nm[4]}} <i> by {{ nm[5] }}</i></li><br>
+  <li>seen {{nm[0]}} on {{nm[2]}} <br> @ {{nm[1]}} <i> by {{ nm[3] }}</i></li><br>
 {% endfor %}
 </ul>
 
